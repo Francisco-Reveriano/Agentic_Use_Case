@@ -12,24 +12,39 @@ interface MarkdownRendererProps {
 
 export function MarkdownRenderer({ content }: MarkdownRendererProps) {
   return (
-    <div className="space-y-3 text-sm leading-relaxed">
+    <div className="space-y-4 text-[0.95rem] leading-7 text-foreground/95">
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         rehypePlugins={[rehypeHighlight]}
         components={{
           p: ({ className, ...props }) => (
-            <p className={cn("whitespace-pre-wrap", className)} {...props} />
+            <p className={cn("whitespace-pre-wrap text-inherit", className)} {...props} />
+          ),
+          h1: ({ className, ...props }) => (
+            <h1 className={cn("display-title text-[2.4rem] text-foreground", className)} {...props} />
+          ),
+          h2: ({ className, ...props }) => (
+            <h2 className={cn("display-title text-[2rem] text-foreground", className)} {...props} />
+          ),
+          h3: ({ className, ...props }) => (
+            <h3 className={cn("font-semibold uppercase tracking-[0.14em] text-foreground", className)} {...props} />
           ),
           ul: ({ className, ...props }) => (
-            <ul className={cn("ml-5 list-disc space-y-1", className)} {...props} />
+            <ul className={cn("ml-5 list-disc space-y-2", className)} {...props} />
           ),
           ol: ({ className, ...props }) => (
-            <ol className={cn("ml-5 list-decimal space-y-1", className)} {...props} />
+            <ol className={cn("ml-5 list-decimal space-y-2", className)} {...props} />
+          ),
+          blockquote: ({ className, ...props }) => (
+            <blockquote
+              className={cn("border-l-4 border-primary pl-4 text-muted-foreground italic", className)}
+              {...props}
+            />
           ),
           pre: ({ className, ...props }) => (
             <pre
               className={cn(
-                "overflow-x-auto rounded-lg border border-border/70 bg-black/85 p-4 text-xs shadow-sm",
+                "output-surface overflow-x-auto rounded-none p-4 text-xs shadow-[8px_8px_0_rgba(203,255,92,0.08)]",
                 className,
               )}
               {...props}
@@ -48,7 +63,7 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             return (
               <code
                 className={cn(
-                  "rounded-md border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-xs",
+                  "rounded-none border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-xs",
                   className,
                 )}
                 {...props}
@@ -58,7 +73,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             );
           },
           a: ({ className, ...props }) => (
-            <a className={cn("text-primary underline underline-offset-2", className)} {...props} />
+            <a className={cn("text-primary underline decoration-2 underline-offset-4", className)} {...props} />
+          ),
+          hr: ({ className, ...props }) => (
+            <hr className={cn("border-border/70", className)} {...props} />
           ),
         }}
       >

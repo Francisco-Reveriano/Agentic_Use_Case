@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import asdict, is_dataclass
+from datetime import datetime, timezone
 from typing import Any, AsyncIterator, Iterable
 
 from agents import RunConfig, Runner
@@ -14,6 +16,7 @@ from pydantic import BaseModel
 from Agents.Agentic_Calculator import Agentic_Calculator_Tool
 
 from ..schemas.chat import ChatHistoryMessage, ChatStreamRequest
+from .chat_logging import ChatRunLogEntry, insert_chat_run
 
 
 def _is_openai_model(model: str) -> bool:
@@ -108,10 +111,53 @@ def _extract_tool_name(raw_item: Any) -> str:
     return "tool"
 
 
+def _resolve_effective_model(selected_model: str | None) -> str:
+    if selected_model:
+        return selected_model
+
+    fallback_model = os.getenv("LLM_MODEL", "").strip()
+    if fallback_model:
+        return fallback_model
+
+    return load_allowed_models()[0]
+
+
+def _count_prompt_chars(history: Iterable[ChatHistoryMessage], message: str) -> int:
+    history_chars = sum(len(chat_message.content.strip()) for chat_message in history)
+    return history_chars + len(message.strip())
+
+
+def _extract_output_metrics(final_output: Any) -> tuple[float | None, str | None]:
+    if not isinstance(final_output, dict):
+        return None, None
+
+    raw_score = final_output.get("score")
+    score = float(raw_score) if isinstance(raw_score, (int, float)) else None
+
+    raw_hallucination_score = final_output.get("hallucination_score")
+    hallucination_score = (
+        raw_hallucination_score
+        if isinstance(raw_hallucination_score, str)
+        else None
+    )
+    return score, hallucination_score
+
+
+async def _safe_insert_chat_run(entry: ChatRunLogEntry) -> None:
+    try:
+        await insert_chat_run(entry)
+    except Exception as exc:
+        print(f"Warning: failed to persist chat run: {exc}", flush=True)
+
+
 async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes]:
     selected_model = resolve_selected_model(payload.model)
+    effective_model = _resolve_effective_model(selected_model)
     run_config = RunConfig(model=selected_model) if selected_model else None
     run_input = build_agent_input(payload.history, payload.message)
+    started_at = datetime.now(timezone.utc)
+    started_perf = time.perf_counter()
+    prompt_chars = _count_prompt_chars(payload.history, payload.message)
 
     result = Runner.run_streamed(
         Agentic_Calculator_Tool,
@@ -120,6 +166,9 @@ async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes
     )
 
     tokens: list[str] = []
+    token_event_count = 0
+    tool_event_count = 0
+    tool_event_names: list[str] = []
 
     try:
         async for event in result.stream_events():
@@ -129,19 +178,23 @@ async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes
                 delta = event.data.delta or ""
                 if delta:
                     tokens.append(delta)
+                    token_event_count += 1
                     yield encode_sse({"type": "token", "data": {"delta": delta}})
                 continue
 
             if isinstance(event, RunItemStreamEvent):
                 if event.name in {"tool_called", "tool_search_called", "mcp_list_tools"}:
                     raw_item = getattr(event.item, "raw_item", None)
+                    tool_name = _extract_tool_name(raw_item)
+                    tool_event_count += 1
+                    tool_event_names.append(f"{event.name}:{tool_name}")
                     yield encode_sse(
                         {
                             "type": "tool_start",
                             "data": {
                                 "event_name": event.name,
                                 "item_type": getattr(event.item, "type", "unknown"),
-                                "tool_name": _extract_tool_name(raw_item),
+                                "tool_name": tool_name,
                                 "title": getattr(event.item, "title", None),
                                 "description": getattr(event.item, "description", None),
                                 "raw_item": to_serializable(raw_item),
@@ -154,13 +207,16 @@ async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes
                     "mcp_approval_response",
                 }:
                     raw_item = getattr(event.item, "raw_item", None)
+                    tool_name = _extract_tool_name(raw_item)
+                    tool_event_count += 1
+                    tool_event_names.append(f"{event.name}:{tool_name}")
                     yield encode_sse(
                         {
                             "type": "tool_end",
                             "data": {
                                 "event_name": event.name,
                                 "item_type": getattr(event.item, "type", "unknown"),
-                                "tool_name": _extract_tool_name(raw_item),
+                                "tool_name": tool_name,
                                 "output": to_serializable(getattr(event.item, "output", None)),
                                 "raw_item": to_serializable(raw_item),
                             },
@@ -173,6 +229,31 @@ async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes
                     {"type": "agent_updated", "data": {"agent_name": event.new_agent.name}}
                 )
     except Exception as exc:
+        completed_at = datetime.now(timezone.utc)
+        partial_text = "".join(tokens)
+        latency_ms = int((time.perf_counter() - started_perf) * 1000)
+
+        await _safe_insert_chat_run(
+            ChatRunLogEntry(
+                created_at=started_at,
+                completed_at=completed_at,
+                latency_ms=latency_ms,
+                status="error",
+                error_message=str(exc),
+                question_text=payload.message.strip(),
+                selected_model=effective_model,
+                history_message_count=len(payload.history),
+                prompt_chars=prompt_chars,
+                streamed_token_event_count=token_event_count,
+                tool_event_count=tool_event_count,
+                tool_event_names=tool_event_names,
+                final_response_text=partial_text or None,
+                final_response_chars=len(partial_text),
+                final_output=None,
+                score=None,
+                hallucination_score=None,
+            )
+        )
         yield encode_sse({"type": "error", "data": {"message": str(exc)}})
         return
 
@@ -180,6 +261,32 @@ async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes
     final_text = "".join(tokens)
     if not final_text and isinstance(final_output, str):
         final_text = final_output
+    score, hallucination_score = _extract_output_metrics(final_output)
+    completed_at = datetime.now(timezone.utc)
+    latency_ms = int((time.perf_counter() - started_perf) * 1000)
 
     yield encode_sse({"type": "final", "data": {"output": final_output, "text": final_text}})
-    yield encode_sse({"type": "done", "data": {"model": selected_model or os.getenv("LLM_MODEL")}})
+
+    await _safe_insert_chat_run(
+        ChatRunLogEntry(
+            created_at=started_at,
+            completed_at=completed_at,
+            latency_ms=latency_ms,
+            status="success",
+            error_message=None,
+            question_text=payload.message.strip(),
+            selected_model=effective_model,
+            history_message_count=len(payload.history),
+            prompt_chars=prompt_chars,
+            streamed_token_event_count=token_event_count,
+            tool_event_count=tool_event_count,
+            tool_event_names=tool_event_names,
+            final_response_text=final_text or None,
+            final_response_chars=len(final_text),
+            final_output=final_output,
+            score=score,
+            hallucination_score=hallucination_score,
+        )
+    )
+
+    yield encode_sse({"type": "done", "data": {"model": effective_model}})

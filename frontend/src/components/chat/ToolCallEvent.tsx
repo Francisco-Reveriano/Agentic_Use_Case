@@ -27,39 +27,76 @@ function stringifyOutput(output: unknown): string | null {
 export function ToolCallEvent({ event }: ToolCallEventProps) {
   const isStart = event.type === "tool_start";
   const output = stringifyOutput(event.output);
+  const timestamp = new Date(event.createdAt).toLocaleTimeString([], {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 
   return (
     <div
+      data-event-state={isStart ? "start" : "end"}
       className={cn(
-        "rounded-lg border p-3 text-xs",
-        isStart ? "border-amber-500/50 bg-amber-500/10" : "border-emerald-500/40 bg-emerald-500/10",
+        "tool-event-strip ml-2 rounded-none p-4 text-xs",
+        isStart ? "border-primary/40 bg-primary/8" : "border-accent/45 bg-accent/7",
       )}
     >
-      <div className="mb-2 flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          {isStart ? (
-            <Wrench className="h-3.5 w-3.5 text-amber-500" />
-          ) : (
-            <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+      <div className="mb-3 flex items-start gap-3">
+        <div
+          className={cn(
+            "mt-0.5 grid h-10 w-10 shrink-0 place-items-center border-2",
+            isStart ? "border-primary/40 bg-primary/15 text-primary" : "border-accent/50 bg-accent/12 text-accent",
           )}
-          <span className="font-medium text-foreground">
-            {event.toolName || event.title || "Tool action"}
-          </span>
+        >
+          {isStart ? (
+            <Wrench className="h-4 w-4" />
+          ) : (
+            <CheckCircle2 className="h-4 w-4" />
+          )}
         </div>
-        <Badge variant={isStart ? "secondary" : "default"}>
-          {isStart ? "started" : "completed"}
-        </Badge>
-      </div>
 
-      <div className="space-y-1 text-muted-foreground">
-        {event.eventName ? <p>event: {event.eventName}</p> : null}
-        {event.itemType ? <p>item: {event.itemType}</p> : null}
-        {event.description ? <p>{event.description}</p> : null}
-        {output ? (
-          <pre className="mt-2 overflow-x-auto rounded-md border border-border/60 bg-background/70 p-2 text-[11px]">
-            {output}
-          </pre>
-        ) : null}
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className={cn("panel-kicker", isStart ? "text-primary/85" : "text-accent/85")}>
+                {event.eventName || "tool event"}
+              </p>
+              <h3 className="display-title truncate text-[2rem] text-foreground">
+                {event.toolName || event.title || "Tool action"}
+              </h3>
+            </div>
+
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <Badge
+                className={cn(
+                  "rounded-none border px-2 py-1 text-[10px] uppercase tracking-[0.24em]",
+                  isStart
+                    ? "border-primary/40 bg-primary/15 text-primary hover:bg-primary/15"
+                    : "border-accent/40 bg-accent/15 text-accent hover:bg-accent/15",
+                )}
+              >
+                {isStart ? "armed" : "resolved"}
+              </Badge>
+              <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
+                {timestamp}
+              </span>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap gap-2 font-mono text-[10px] uppercase tracking-[0.22em] text-muted-foreground">
+            {event.itemType ? (
+              <span className="border border-border/60 bg-background/55 px-2 py-1">{event.itemType}</span>
+            ) : null}
+            {event.description ? (
+              <span className="border border-border/60 bg-background/55 px-2 py-1">{event.description}</span>
+            ) : null}
+          </div>
+
+          {output ? (
+            <pre className="output-surface mt-3 overflow-x-auto p-3 text-[11px] leading-5 text-muted-foreground">
+              {output}
+            </pre>
+          ) : null}
+        </div>
       </div>
     </div>
   );
