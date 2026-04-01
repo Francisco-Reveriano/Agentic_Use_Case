@@ -12,7 +12,7 @@ from fastapi.encoders import jsonable_encoder
 from openai.types.responses.response_text_delta_event import ResponseTextDeltaEvent
 from pydantic import BaseModel
 
-from Agents.Agentic_Calculator import Agentic_Calculator_Tool
+from ..agents.agentic_calculator import Agentic_Calculator_Tool
 
 from ..config.env import get_allowed_openai_models, get_default_openai_model
 from ..schemas.chat import ChatHistoryMessage, ChatStreamRequest

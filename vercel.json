@@ -8,10 +8,7 @@
     "api": {
       "entrypoint": "backend/main.py",
       "routePrefix": "/api",
-      "maxDuration": 300,
-      "includeFiles": [
-        "Agents/**"
-      ]
+      "maxDuration": 300
     }
   }
 }
