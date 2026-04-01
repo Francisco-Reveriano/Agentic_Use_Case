@@ -2,19 +2,37 @@ import { useEffect, useRef } from "react";
 
 import type { ChatMessage } from "@/features/chat/chatTypes";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 import { MessageBubble } from "./MessageBubble";
 import { cn } from "@/lib/utils";
 
 interface MessageListProps {
   messages: ChatMessage[];
+  highlightedMessageId: string | null;
+  suggestedUseCases: string[];
+  onSuggestionSelect: (suggestion: string) => void;
 }
 
-export function MessageList({ messages }: MessageListProps) {
+export function MessageList({
+  messages,
+  highlightedMessageId,
+  suggestedUseCases,
+  onSuggestionSelect,
+}: MessageListProps) {
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages]);
+
+  useEffect(() => {
+    if (!highlightedMessageId) {
+      return;
+    }
+
+    const target = document.getElementById(`transcript-${highlightedMessageId}`);
+    target?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlightedMessageId]);
 
   return (
     <ScrollArea className="panel-surface panel-heavy min-h-[34rem] max-h-[72vh] p-0">
@@ -43,17 +61,16 @@ export function MessageList({ messages }: MessageListProps) {
               error risk to see how the scoring agent responds.
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
-              {[
-                "invoice review triage",
-                "first-pass contract analysis",
-                "support ticket categorization",
-              ].map((example) => (
-                <span
+              {suggestedUseCases.map((example) => (
+                <Button
                   key={example}
-                  className="border-2 border-border/70 bg-background/60 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground"
+                  type="button"
+                  variant="ghost"
+                  onClick={() => onSuggestionSelect(example)}
+                  className="suggestion-chip rounded-none border-2 border-border/70 bg-background/60 px-3 py-2 font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground hover:bg-background/80"
                 >
                   {example}
-                </span>
+                </Button>
               ))}
             </div>
           </div>
@@ -66,6 +83,8 @@ export function MessageList({ messages }: MessageListProps) {
               {messages.map((message, index) => (
                 <div
                   key={message.id}
+                  id={`transcript-${message.id}`}
+                  data-highlighted={message.id === highlightedMessageId ? "true" : "false"}
                   className="feed-entry relative pl-8"
                   style={{ animationDelay: `${Math.min(index, 10) * 80}ms` }}
                 >
@@ -74,10 +93,17 @@ export function MessageList({ messages }: MessageListProps) {
                       "absolute left-0 top-6 h-3.5 w-3.5 border-2 bg-background",
                       message.role === "assistant"
                         ? "border-primary shadow-[0_0_0_4px_var(--signal-soft)]"
-                        : "border-accent shadow-[0_0_0_4px_rgba(255,122,0,0.12)]",
+                        : "border-accent shadow-[0_0_0_4px_rgba(189,197,184,0.12)]",
                     )}
                   />
-                  <MessageBubble message={message} />
+                  <div
+                    className={cn(
+                      "transition-all duration-300",
+                      message.id === highlightedMessageId ? "scale-[1.01]" : "scale-100",
+                    )}
+                  >
+                    <MessageBubble message={message} />
+                  </div>
                 </div>
               ))}
             </div>

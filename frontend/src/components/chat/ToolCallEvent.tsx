@@ -74,7 +74,7 @@ export function ToolCallEvent({ event }: ToolCallEventProps) {
                     : "border-accent/40 bg-accent/15 text-accent hover:bg-accent/15",
                 )}
               >
-                {isStart ? "armed" : "resolved"}
+                {isStart ? "running" : "complete"}
               </Badge>
               <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
                 {timestamp}

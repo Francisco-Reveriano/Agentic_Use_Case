@@ -15,6 +15,13 @@ const DEFAULT_API_BASE_URL = "http://localhost:8000";
 const DEPLOYED_API_BASE_URL = "/api";
 const LOCAL_VITE_PORTS = new Set(["5173", "4173"]);
 type StructuredAssessment = Record<string, unknown>;
+const ASSESSMENT_DIMENSIONS = [
+  "Data Input Nature",
+  "Process Logic & Repetitiveness",
+  "Decision Complexity & Human Judgement",
+  "Regulatory & Compliance Scrutiny",
+  "Impact of Error & Risk Severity",
+] as const;
 
 function createId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -132,51 +139,76 @@ function getSuitabilityLabel(score: number | null): string | null {
   return "Unsuitable - traditional automation or human execution preferred";
 }
 
-function formatReasoningSections(reasoning: string): string[] {
-  const blocks = reasoning
-    .split(/\n\s*\n/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+type DimensionRow = {
+  label: string;
+  score: string | null;
+  reasoning: string;
+};
 
-  const lines: string[] = [];
-  let sawDimensionSection = false;
-  let insertedSummaryHeading = false;
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\n+/g, "<br /><br />").trim();
+}
 
-  for (const block of blocks) {
-    const sectionMatch = block.match(/^([^:\n]{2,80}):\s*(.+)$/s);
-    if (sectionMatch) {
-      sawDimensionSection = true;
-      const label = sectionMatch[1].trim();
-      let body = sectionMatch[2].trim();
-      let dimensionScore: string | null = null;
+function extractDimensionRows(reasoning: string): {
+  rows: DimensionRow[];
+  summary: string | null;
+} {
+  const normalized = reasoning.replace(/\r\n/g, "\n").trim();
+  const positions = ASSESSMENT_DIMENSIONS.map((label) => ({
+    label,
+    index: normalized.indexOf(`${label}:`),
+  }))
+    .filter((entry) => entry.index >= 0)
+    .sort((left, right) => left.index - right.index);
 
-      const scoreMatch = body.match(/^([0-5](?:\.\d+)?\/5(?:\.\d+)?)\.?\s*(.*)$/s);
-      if (scoreMatch) {
-        dimensionScore = scoreMatch[1];
-        body = scoreMatch[2].trim();
-      }
-
-      lines.push(`#### ${label}`);
-      if (dimensionScore) {
-        lines.push(`**Dimension score:** ${dimensionScore}`);
-        lines.push("");
-      }
-      lines.push(body);
-      lines.push("");
-      continue;
-    }
-
-    if (sawDimensionSection && !insertedSummaryHeading) {
-      lines.push("### Summary");
-      lines.push("");
-      insertedSummaryHeading = true;
-    }
-
-    lines.push(block);
-    lines.push("");
+  if (!positions.length) {
+    return {
+      rows: [],
+      summary: normalized || null,
+    };
   }
 
-  return lines;
+  const rows: DimensionRow[] = [];
+  const summaryParts: string[] = [];
+  const preface = normalized.slice(0, positions[0].index).trim();
+  if (preface) {
+    summaryParts.push(preface);
+  }
+
+  positions.forEach((entry, index) => {
+    const start = entry.index + entry.label.length + 1;
+    const end = index < positions.length - 1 ? positions[index + 1].index : normalized.length;
+    let body = normalized.slice(start, end).trim();
+
+    if (index === positions.length - 1) {
+      const overallMatch = body.match(/(?:^|\n{2,})(Overall[,:\s][\s\S]*)$/i);
+      if (overallMatch && overallMatch.index !== undefined) {
+        const overallText = overallMatch[1].trim();
+        body = body.slice(0, overallMatch.index).trim();
+        if (overallText) {
+          summaryParts.push(overallText);
+        }
+      }
+    }
+
+    let score: string | null = null;
+    const scoreMatch = body.match(/^([0-5](?:\.\d+)?\/5(?:\.0)?)\.?\s*(.*)$/s);
+    if (scoreMatch) {
+      score = scoreMatch[1];
+      body = scoreMatch[2].trim();
+    }
+
+    rows.push({
+      label: entry.label,
+      score,
+      reasoning: body || "No reasoning provided.",
+    });
+  });
+
+  return {
+    rows,
+    summary: summaryParts.join("\n\n").trim() || null,
+  };
 }
 
 function buildAssessmentMarkdown(outputRecord: StructuredAssessment): string {
@@ -184,6 +216,9 @@ function buildAssessmentMarkdown(outputRecord: StructuredAssessment): string {
   const hallucination = asString(outputRecord.hallucination_score);
   const reasoning = asString(outputRecord.reasoning);
   const suitability = getSuitabilityLabel(score);
+  const { rows, summary } = reasoning
+    ? extractDimensionRows(reasoning)
+    : { rows: [], summary: null as string | null };
 
   const lines = [
     "## Agentic Calculator Assessment",
@@ -198,10 +233,28 @@ function buildAssessmentMarkdown(outputRecord: StructuredAssessment): string {
   lines.push(`- **Hallucination risk:** ${hallucination ?? "N/A"}`);
   lines.push("");
 
-  if (reasoning) {
+  if (rows.length) {
+    lines.push("### Dimension Review");
+    lines.push("");
+    lines.push("| Dimension | Reasoning |");
+    lines.push("| --- | --- |");
+    rows.forEach((row) => {
+      const dimensionLabel = row.score ? `${row.label} (${row.score})` : row.label;
+      lines.push(
+        `| ${escapeMarkdownTableCell(dimensionLabel)} | ${escapeMarkdownTableCell(row.reasoning)} |`,
+      );
+    });
+    lines.push("");
+  }
+
+  if (summary) {
+    lines.push("### Executive Summary");
+    lines.push("");
+    lines.push(summary);
+  } else if (reasoning) {
     lines.push("### Detailed Analysis");
     lines.push("");
-    lines.push(...formatReasoningSections(reasoning));
+    lines.push(reasoning);
   } else {
     lines.push("### Structured Result");
     lines.push("");

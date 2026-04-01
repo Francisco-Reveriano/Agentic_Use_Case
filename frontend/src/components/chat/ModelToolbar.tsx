@@ -35,14 +35,14 @@ export function ModelToolbar({
 
           <div>
             <p className="panel-kicker text-primary/85">control surface</p>
-            <h2 className="display-title text-[2.7rem] text-foreground">Select The Brain</h2>
+            <h2 className="display-title text-[2.7rem] text-foreground">Select a Model</h2>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
             <span className={cn("status-pulse h-2.5 w-2.5 rounded-full", disabled ? "bg-accent" : "bg-primary")} />
-            <span>{disabled ? "console locked" : "console armed"}</span>
+            <span>{disabled ? "selection locked" : "selection ready"}</span>
           </div>
 
           <Button
@@ -103,7 +103,7 @@ export function ModelToolbar({
         </div>
 
         <span className="font-mono text-[10px] uppercase tracking-[0.24em] text-muted-foreground">
-          allowlist locked to OpenAI models
+          constrained to approved OpenAI models
         </span>
       </div>
     </div>

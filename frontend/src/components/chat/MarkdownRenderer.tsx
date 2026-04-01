@@ -41,6 +41,32 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
               {...props}
             />
           ),
+          table: ({ className, ...props }) => (
+            <div className="overflow-x-auto">
+              <table className={cn("markdown-table min-w-full border-collapse", className)} {...props} />
+            </div>
+          ),
+          thead: ({ className, ...props }) => (
+            <thead className={cn("bg-primary/10 text-foreground", className)} {...props} />
+          ),
+          tbody: ({ className, ...props }) => (
+            <tbody className={cn("divide-y divide-border/60", className)} {...props} />
+          ),
+          tr: ({ className, ...props }) => (
+            <tr className={cn("border-b border-border/60", className)} {...props} />
+          ),
+          th: ({ className, ...props }) => (
+            <th
+              className={cn(
+                "border border-border/60 px-3 py-2 text-left text-xs uppercase tracking-[0.14em]",
+                className,
+              )}
+              {...props}
+            />
+          ),
+          td: ({ className, ...props }) => (
+            <td className={cn("border border-border/60 px-3 py-3 align-top text-sm leading-6", className)} {...props} />
+          ),
           pre: ({ className, ...props }) => (
             <pre
               className={cn(

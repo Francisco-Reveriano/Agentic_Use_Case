@@ -66,7 +66,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           "message-shell w-full max-w-[92%] rounded-none border-2 p-0 shadow-none",
           isAssistant
             ? "bg-[linear-gradient(180deg,rgba(28,31,39,0.98),rgba(17,19,25,0.98))]"
-            : "rotate-[-1deg] bg-[linear-gradient(180deg,rgba(207,255,76,0.15),rgba(114,146,27,0.08))] text-foreground md:translate-x-3",
+            : "bg-[linear-gradient(180deg,rgba(26,47,41,0.38),rgba(20,29,33,0.28))] text-foreground md:translate-x-1",
         )}
       >
         <div

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { Activity, Bot, Gauge, Radar, Sparkles, Workflow } from "lucide-react";
 
 import { Composer } from "./Composer";
+import { ConversationToolbar } from "./ConversationToolbar";
 import { MessageList } from "./MessageList";
 import { ModelToolbar } from "./ModelToolbar";
 import { ToolCallEvent } from "./ToolCallEvent";
@@ -28,6 +30,16 @@ export function ChatShell({
   const userMessageCount = state.messages.filter((message) => message.role === "user").length;
   const assistantMessageCount = state.messages.filter((message) => message.role === "assistant").length;
   const reversedToolEvents = [...state.toolEvents].reverse();
+  const [draftValue, setDraftValue] = useState("");
+  const [focusToken, setFocusToken] = useState(0);
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
+
+  const suggestedUseCases = [
+    "Call transcript summary in a call center",
+    "First-pass contract analysis for legal operations",
+    "Support ticket categorization for customer service",
+    "Loan document review and issue flagging",
+  ];
 
   const sessionStatusLabel =
     state.sessionStatus === "submitted"
@@ -39,20 +51,33 @@ export function ChatShell({
           : "IDLE";
 
   const marqueeItems = [
-    "streaming responses",
-    "tool telemetry",
+    "consulting-grade assessments",
+    "dimension-by-dimension review",
+    "follow-up context",
+    "structured markdown output",
     "markdown rendering",
     "openai model deck",
-    "follow-up context",
-    "agentic scoring",
+    "operating-model analysis",
   ];
+
+  const handleSuggestionSelect = (suggestion: string) => {
+    if (isBusy) {
+      return;
+    }
+    setDraftValue(suggestion);
+    setFocusToken((token) => token + 1);
+  };
+
+  const handleMessageSelect = (messageId: string) => {
+    setHighlightedMessageId(messageId);
+  };
 
   return (
     <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-6 md:px-6 md:py-8">
       <section className="grid gap-4 xl:grid-cols-[minmax(0,1.28fr)_340px]">
         <header className="panel-surface panel-heavy relative min-h-[24rem] px-5 py-5 sm:px-6 sm:py-6">
-          <div className="absolute right-4 top-4 rotate-[-4deg] border-2 border-primary bg-primary px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.34em] text-primary-foreground">
-            live sse
+          <div className="absolute right-4 top-4 border border-primary/45 bg-primary/12 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.34em] text-primary">
+            live analysis
           </div>
 
           <div className="relative z-10 flex h-full flex-col justify-between gap-8">
@@ -68,22 +93,20 @@ export function ChatShell({
 
               <div className="space-y-3">
                 <p className="panel-kicker text-primary/90">
-                  Gen-AI suitability assessor / brutalist experimental control surface
+                  Generative AI suitability review desk
                 </p>
                 <div className="flex items-start gap-3">
                   <Bot className="mt-2 h-6 w-6 text-primary" />
                   <div className="space-y-3">
                     <h1 className="display-title text-[clamp(4.8rem,12vw,9.5rem)] text-foreground">
-                      Assess
+                      Assess the
                       <br />
-                      The
-                      <br />
-                      Process
+                      use case
                     </h1>
-                    <p className="max-w-2xl text-sm uppercase leading-6 tracking-[0.16em] text-muted-foreground">
-                      A streaming evaluation rig for interrogating business workflows through the
-                      `Agentic_Calculator_Tool`, with live token flow, model switching, markdown
-                      output, and visible tool telemetry.
+                    <p className="max-w-2xl text-sm leading-7 tracking-[0.04em] text-muted-foreground">
+                      A consulting-style workspace for interrogating business processes through the
+                      `Agentic_Calculator_Tool`, with live analysis, model switching, structured
+                      Markdown output, and visible tool telemetry.
                     </p>
                   </div>
                 </div>
@@ -154,11 +177,25 @@ export function ChatShell({
             onClearChat={onClearChat}
           />
 
-          <MessageList messages={state.messages} />
+          <ConversationToolbar
+            messages={state.messages}
+            activeMessageId={highlightedMessageId}
+            onMessageSelect={handleMessageSelect}
+          />
+
+          <MessageList
+            messages={state.messages}
+            highlightedMessageId={highlightedMessageId}
+            suggestedUseCases={suggestedUseCases}
+            onSuggestionSelect={handleSuggestionSelect}
+          />
 
           <Composer
+            value={draftValue}
             disabled={isBusy || !state.availableModels.length}
             isStreaming={state.sessionStatus === "streaming" || state.sessionStatus === "submitted"}
+            focusToken={focusToken}
+            onValueChange={setDraftValue}
             onSend={onSendMessage}
             onCancel={onCancelStreaming}
           />
