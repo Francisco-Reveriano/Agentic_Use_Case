@@ -6,7 +6,7 @@ from fastapi.responses import StreamingResponse
 from ..schemas.chat import ChatStreamRequest, ModelsResponse
 from ..services.agent_stream import load_allowed_models, resolve_selected_model, stream_agent_events
 
-router = APIRouter(prefix="/api", tags=["chat"])
+router = APIRouter(tags=["chat"])
 
 
 @router.get("/models", response_model=ModelsResponse)

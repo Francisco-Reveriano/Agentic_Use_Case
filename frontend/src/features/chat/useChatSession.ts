@@ -12,6 +12,8 @@ import type {
 import { fetchModels, streamChatSse } from "@/lib/sseChatClient";
 
 const DEFAULT_API_BASE_URL = "http://localhost:8000";
+const DEPLOYED_API_BASE_URL = "/api";
+const LOCAL_VITE_PORTS = new Set(["5173", "4173"]);
 
 function createId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -21,8 +23,16 @@ function createId(prefix: string): string {
 }
 
 function getApiBaseUrl(): string {
-  const configured = import.meta.env.VITE_API_BASE_URL;
-  return configured?.trim() || DEFAULT_API_BASE_URL;
+  const configured = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configured) {
+    return configured;
+  }
+
+  if (typeof window !== "undefined" && LOCAL_VITE_PORTS.has(window.location.port)) {
+    return DEFAULT_API_BASE_URL;
+  }
+
+  return DEPLOYED_API_BASE_URL;
 }
 
 function safeReadStoredState(): PersistedChatState | null {

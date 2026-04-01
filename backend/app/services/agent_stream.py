@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 import time
 from dataclasses import asdict, is_dataclass
 from datetime import datetime, timezone
@@ -15,39 +14,13 @@ from pydantic import BaseModel
 
 from Agents.Agentic_Calculator import Agentic_Calculator_Tool
 
+from ..config.env import get_allowed_openai_models, get_default_openai_model
 from ..schemas.chat import ChatHistoryMessage, ChatStreamRequest
 from .chat_logging import ChatRunLogEntry, insert_chat_run
 
 
-def _is_openai_model(model: str) -> bool:
-    normalized = model.strip().lower()
-    return normalized.startswith(("gpt-", "o1", "o3", "o4", "openai/"))
-
-
 def load_allowed_models() -> list[str]:
-    raw_models = os.getenv("OPENAI_MODELS", "")
-    configured_models = [
-        model.strip()
-        for model in raw_models.split(",")
-        if model.strip() and _is_openai_model(model)
-    ]
-
-    fallback_model = os.getenv("LLM_MODEL", "").strip()
-    if not configured_models and fallback_model and _is_openai_model(fallback_model):
-        configured_models = [fallback_model]
-
-    if not configured_models:
-        configured_models = ["gpt-4.1-mini"]
-
-    # Keep order stable while removing duplicates.
-    seen: set[str] = set()
-    deduped_models: list[str] = []
-    for model in configured_models:
-        if model in seen:
-            continue
-        seen.add(model)
-        deduped_models.append(model)
-    return deduped_models
+    return get_allowed_openai_models()
 
 
 def resolve_selected_model(requested_model: str | None) -> str | None:
@@ -114,12 +87,7 @@ def _extract_tool_name(raw_item: Any) -> str:
 def _resolve_effective_model(selected_model: str | None) -> str:
     if selected_model:
         return selected_model
-
-    fallback_model = os.getenv("LLM_MODEL", "").strip()
-    if fallback_model:
-        return fallback_model
-
-    return load_allowed_models()[0]
+    return get_default_openai_model()
 
 
 def _count_prompt_chars(history: Iterable[ChatHistoryMessage], message: str) -> int:

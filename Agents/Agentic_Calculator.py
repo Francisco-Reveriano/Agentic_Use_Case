@@ -4,6 +4,8 @@ from agents import Agent
 from agents.model_settings import ModelSettings
 from pydantic import BaseModel
 
+from backend.app.config.env import get_default_openai_model
+
 AGENTIC_CALCULATOR_TOOL_PROMPT = '''
 # 📊 Generative-AI Appropriateness Assessor  
 You are a **domain-agnostic evaluator** whose sole task is to judge *how suitable Generative AI is for a specific business activity* and to explain your reasoning.  
@@ -52,5 +54,5 @@ Agentic_Calculator_Tool = Agent(
     name="Agentic_Calculator_Tool",
     instructions=AGENTIC_CALCULATOR_TOOL_PROMPT,
     output_type=Agentic_Calculator_Tool_Output,
-    model=os.getenv("LLM_MODEL"),
+    model=os.getenv("LLM_MODEL") or get_default_openai_model(),
 )

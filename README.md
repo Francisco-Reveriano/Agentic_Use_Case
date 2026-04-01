@@ -20,6 +20,8 @@ This project is a full-stack chatbot with:
 - `frontend/src/features/chat/` — reducer + local storage state management
 - `frontend/src/lib/sseChatClient.ts` — SSE stream parser/client
 - `run-local.sh` — one-command local startup that kills old runs, bootstraps the database, and starts backend + frontend
+- `vercel.json` — Vercel Services routing for the frontend + FastAPI backend
+- `backend/main.py` — Vercel Python service entrypoint
 
 ## Provision Neon Postgres
 
@@ -32,6 +34,25 @@ Recommended flow:
 3. Use the same `DATABASE_URL` locally in the project root `.env`.
 4. Add the same `DATABASE_URL` to your Vercel environment variables for deployment.
 
+## Deploy On Vercel
+
+This repo is designed to deploy as a **single Vercel project using Services**:
+
+- `web` service → `frontend`
+- `api` service → `backend/main.py`
+
+Required Vercel project settings:
+
+1. Set the **Framework Preset** to **Services**
+2. Add the required environment variables in Vercel project settings
+3. Ensure Neon environment variables are available in the same project
+
+Important routing behavior:
+
+- The backend service is mounted at `/api` by Vercel Services
+- FastAPI routes are therefore declared without the outer `/api` prefix
+- The frontend uses relative `/api/...` calls in deployed environments
+
 ## Environment Setup
 
 ### Backend env
@@ -41,11 +62,20 @@ Copy `backend/.env.example` to `.env` in the project root (or export the variabl
 ```bash
 DATABASE_URL=postgresql://user:password@your-neon-host.neon.tech/database?sslmode=require
 OPENAI_API_KEY=your_openai_api_key_here
-LLM_MODEL=gpt-4.1-mini
-OPENAI_MODELS=gpt-5,gpt-5-mini,gpt-4.1,gpt-4.1-mini,gpt-4o-mini
+LLM_MODEL=
+OPENAI_ADVANCE_LLM_MODEL=gpt-5
+OPENAI_MEDIUM_LLM_MODEL=gpt-5-mini
+OPENAI_LOW_LLM_MODEL=gpt-4.1-mini
+OPENAI_MODELS=
 FRONTEND_ORIGIN=http://localhost:5173
 DB_POOL_MAX_SIZE=5
 ```
+
+Notes:
+
+- `DATABASE_URL` is preferred, but the backend also accepts `POSTGRES_URL` and `POSTGRES_PRISMA_URL`
+- `LLM_MODEL` is optional; if omitted, the app derives its OpenAI model behavior from the tiered `OPENAI_*_LLM_MODEL` variables
+- `OPENAI_MODELS` is optional; if omitted, `/models` is synthesized from the tiered OpenAI env values
 
 ### Frontend env
 
@@ -54,6 +84,8 @@ Copy `frontend/.env.example` to `frontend/.env`:
 ```bash
 VITE_API_BASE_URL=http://localhost:8000
 ```
+
+This variable is for local Vite development only. In deployed Vercel environments, the frontend uses relative `/api` calls automatically.
 
 ## Install Dependencies
 
@@ -105,6 +137,14 @@ Then open:
 
 ### `GET /api/models`
 
+Deployed path:
+
+- `/api/models` on Vercel Services
+
+Direct backend path when calling the backend service itself locally:
+
+- `/models`
+
 Returns:
 
 ```json
@@ -115,6 +155,14 @@ Returns:
 ```
 
 ### `POST /api/chat/stream`
+
+Deployed path:
+
+- `/api/chat/stream` on Vercel Services
+
+Direct backend path when calling the backend service itself locally:
+
+- `/chat/stream`
 
 Request body:
 

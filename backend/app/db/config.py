@@ -4,16 +4,18 @@ import os
 
 import asyncpg
 
+from ..config.env import get_database_url_from_env
+
 DEFAULT_DB_APPLICATION_NAME = "agentic-calculator-chatbot"
 
 _pool: asyncpg.Pool | None = None
 
 
 def get_database_url() -> str:
-    database_url = os.getenv("DATABASE_URL", "").strip()
+    database_url = get_database_url_from_env()
     if not database_url:
         raise RuntimeError(
-            "DATABASE_URL is required. Provision a Neon Postgres database and add it to the root .env."
+            "A database URL is required. Set DATABASE_URL or the Neon/Vercel Postgres aliases."
         )
     return database_url
 

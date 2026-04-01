@@ -32,11 +32,29 @@ require_command() {
 
 load_env_file() {
   local path="$1"
+  local line=""
+  local key=""
+  local value=""
 
-  set -a
-  # shellcheck disable=SC1090
-  source "$path"
-  set +a
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    [[ -z "$line" ]] && continue
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ "$line" != *=* ]] && continue
+
+    key="${line%%=*}"
+    value="${line#*=}"
+
+    key="${key#"${key%%[![:space:]]*}"}"
+    key="${key%"${key##*[![:space:]]}"}"
+
+    if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+      value="${value:1:${#value}-2}"
+    elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+      value="${value:1:${#value}-2}"
+    fi
+
+    export "$key=$value"
+  done < "$path"
 }
 
 maybe_load_env_file() {
@@ -110,6 +128,7 @@ main() {
     maybe_load_env_file "$ROOT_DIR/frontend/.env.example"
   fi
 
+  : "${DATABASE_URL:=${POSTGRES_URL:-${POSTGRES_PRISMA_URL:-}}}"
   : "${DATABASE_URL:?DATABASE_URL is required in .env}"
   : "${OPENAI_API_KEY:?OPENAI_API_KEY is required in .env}"
   : "${VITE_API_BASE_URL:=http://localhost:8000}"

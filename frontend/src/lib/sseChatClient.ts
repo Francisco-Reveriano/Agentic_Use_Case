@@ -12,6 +12,14 @@ interface StreamChatOptions {
   onEvent: (event: StreamEventPayload) => void;
 }
 
+function buildApiUrl(apiBaseUrl: string, path: string): string {
+  const normalizedBase = apiBaseUrl.trim().replace(/\/+$/, "");
+  if (!normalizedBase) {
+    return path;
+  }
+  return `${normalizedBase}${path}`;
+}
+
 function parseSseBlock(block: string): StreamEventPayload | null {
   const lines = block.split("\n");
   const dataLines = lines
@@ -28,7 +36,7 @@ function parseSseBlock(block: string): StreamEventPayload | null {
 }
 
 export async function streamChatSse(options: StreamChatOptions): Promise<void> {
-  const response = await fetch(`${options.apiBaseUrl}/api/chat/stream`, {
+  const response = await fetch(buildApiUrl(options.apiBaseUrl, "/chat/stream"), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -78,7 +86,7 @@ export async function streamChatSse(options: StreamChatOptions): Promise<void> {
 }
 
 export async function fetchModels(apiBaseUrl: string): Promise<ModelsResponse> {
-  const response = await fetch(`${apiBaseUrl}/api/models`);
+  const response = await fetch(buildApiUrl(apiBaseUrl, "/models"));
   if (!response.ok) {
     throw new Error("Could not load models.");
   }
