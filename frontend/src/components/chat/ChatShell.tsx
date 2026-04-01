@@ -43,7 +43,7 @@ export function ChatShell({
     "tool telemetry",
     "markdown rendering",
     "openai model deck",
-    "message persistence",
+    "follow-up context",
     "agentic scoring",
   ];
 

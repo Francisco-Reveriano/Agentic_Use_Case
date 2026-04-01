@@ -22,6 +22,8 @@ interface RequestScopedPayload {
   requestId: string;
 }
 
+type MarkStreamingPayload = RequestScopedPayload;
+
 interface AppendTokenPayload extends RequestScopedPayload {
   delta: string;
 }
@@ -43,6 +45,7 @@ type ChatAction =
   | { type: "set_models"; payload: SetModelsPayload }
   | { type: "select_model"; payload: string }
   | { type: "start_request"; payload: StartRequestPayload }
+  | { type: "mark_streaming"; payload: MarkStreamingPayload }
   | { type: "append_token"; payload: AppendTokenPayload }
   | { type: "add_tool_event"; payload: AddToolEventPayload }
   | { type: "finalize_assistant"; payload: FinalizeAssistantPayload }
@@ -121,6 +124,20 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         activeAssistantMessageId: action.payload.assistantMessage.id,
         messages: [...state.messages, action.payload.userMessage, action.payload.assistantMessage],
       };
+    case "mark_streaming":
+      if (!isActiveRequest(state, action.payload.requestId)) {
+        return state;
+      }
+      return withUpdatedActiveAssistant(
+        {
+          ...state,
+          sessionStatus: "streaming",
+        },
+        (message) => ({
+          ...message,
+          status: "streaming",
+        }),
+      );
     case "append_token":
       if (!isActiveRequest(state, action.payload.requestId)) {
         return state;

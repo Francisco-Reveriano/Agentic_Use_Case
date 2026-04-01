@@ -14,6 +14,7 @@ import { fetchModels, streamChatSse } from "@/lib/sseChatClient";
 const DEFAULT_API_BASE_URL = "http://localhost:8000";
 const DEPLOYED_API_BASE_URL = "/api";
 const LOCAL_VITE_PORTS = new Set(["5173", "4173"]);
+type StructuredAssessment = Record<string, unknown>;
 
 function createId(prefix: string): string {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
@@ -62,7 +63,7 @@ function buildInitialState(): ChatState {
   }
   return {
     ...state,
-    messages: persisted.messages,
+    messages: normalizePersistedMessages(persisted.messages),
     toolEvents: persisted.toolEvents,
     selectedModel: persisted.selectedModel,
   };
@@ -72,44 +73,182 @@ function asString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+function asNumber(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === "string") {
+    const normalized = Number(value);
+    if (Number.isFinite(normalized)) {
+      return normalized;
+    }
+  }
+
+  return null;
+}
+
+function parseStructuredAssessment(value: unknown): StructuredAssessment | null {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    return value as StructuredAssessment;
+  }
+
+  if (typeof value !== "string") {
+    return null;
+  }
+
+  const trimmed = value.trim();
+  if (!trimmed.startsWith("{")) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(trimmed);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed)
+      ? (parsed as StructuredAssessment)
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function getSuitabilityLabel(score: number | null): string | null {
+  if (score === null) {
+    return null;
+  }
+
+  if (score >= 4.0) {
+    return "Highly suitable for Gen-AI automation / augmentation";
+  }
+
+  if (score >= 3.0) {
+    return "Moderately suitable - pilot recommended with guardrails";
+  }
+
+  if (score >= 2.0) {
+    return "Low suitability - limited Gen-AI benefit without significant redesign";
+  }
+
+  return "Unsuitable - traditional automation or human execution preferred";
+}
+
+function formatReasoningSections(reasoning: string): string[] {
+  const blocks = reasoning
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  const lines: string[] = [];
+  let sawDimensionSection = false;
+  let insertedSummaryHeading = false;
+
+  for (const block of blocks) {
+    const sectionMatch = block.match(/^([^:\n]{2,80}):\s*(.+)$/s);
+    if (sectionMatch) {
+      sawDimensionSection = true;
+      const label = sectionMatch[1].trim();
+      let body = sectionMatch[2].trim();
+      let dimensionScore: string | null = null;
+
+      const scoreMatch = body.match(/^([0-5](?:\.\d+)?\/5(?:\.\d+)?)\.?\s*(.*)$/s);
+      if (scoreMatch) {
+        dimensionScore = scoreMatch[1];
+        body = scoreMatch[2].trim();
+      }
+
+      lines.push(`#### ${label}`);
+      if (dimensionScore) {
+        lines.push(`**Dimension score:** ${dimensionScore}`);
+        lines.push("");
+      }
+      lines.push(body);
+      lines.push("");
+      continue;
+    }
+
+    if (sawDimensionSection && !insertedSummaryHeading) {
+      lines.push("### Summary");
+      lines.push("");
+      insertedSummaryHeading = true;
+    }
+
+    lines.push(block);
+    lines.push("");
+  }
+
+  return lines;
+}
+
+function buildAssessmentMarkdown(outputRecord: StructuredAssessment): string {
+  const score = asNumber(outputRecord.score);
+  const hallucination = asString(outputRecord.hallucination_score);
+  const reasoning = asString(outputRecord.reasoning);
+  const suitability = getSuitabilityLabel(score);
+
+  const lines = [
+    "## Agentic Calculator Assessment",
+    "",
+    `- **Overall score:** ${score !== null ? `${score.toFixed(1)} / 5.0` : "N/A"}`,
+  ];
+
+  if (suitability) {
+    lines.push(`- **Suitability:** ${suitability}`);
+  }
+
+  lines.push(`- **Hallucination risk:** ${hallucination ?? "N/A"}`);
+  lines.push("");
+
+  if (reasoning) {
+    lines.push("### Detailed Analysis");
+    lines.push("");
+    lines.push(...formatReasoningSections(reasoning));
+  } else {
+    lines.push("### Structured Result");
+    lines.push("");
+    lines.push("```json");
+    lines.push(JSON.stringify(outputRecord, null, 2));
+    lines.push("```");
+  }
+
+  return lines.join("\n").trim();
+}
+
+function normalizePersistedMessages(messages: ChatMessage[]): ChatMessage[] {
+  return messages.map((message) => {
+    if (message.role !== "assistant") {
+      return message;
+    }
+
+    const structuredOutput = parseStructuredAssessment(message.content);
+    if (!structuredOutput) {
+      return message;
+    }
+
+    return {
+      ...message,
+      content: buildAssessmentMarkdown(structuredOutput),
+    };
+  });
+}
+
 function composeFinalText(
   event: StreamEventPayload,
   existingAssistantText: string,
 ): string {
   const data = event.data ?? {};
-  const eventText = asString(data.text);
-  if (eventText && eventText.trim()) {
-    return eventText;
+
+  const structuredOutput =
+    parseStructuredAssessment(data.output) ??
+    parseStructuredAssessment(data.text) ??
+    parseStructuredAssessment(existingAssistantText);
+
+  if (structuredOutput) {
+    return buildAssessmentMarkdown(structuredOutput);
   }
 
-  const output = data.output;
-  if (output && typeof output === "object") {
-    const outputRecord = output as Record<string, unknown>;
-    const score = outputRecord.score;
-    const hallucination = outputRecord.hallucination_score;
-    const reasoning = asString(outputRecord.reasoning);
-
-    if (reasoning || score !== undefined || hallucination !== undefined) {
-      const lines = [
-        "### Agentic Calculator Assessment",
-        "",
-        `- **Overall score:** ${score ?? "N/A"}`,
-        `- **Hallucination risk:** ${hallucination ?? "N/A"}`,
-        "",
-      ];
-
-      if (reasoning) {
-        lines.push("### Reasoning");
-        lines.push(reasoning);
-      } else {
-        lines.push("```json");
-        lines.push(JSON.stringify(outputRecord, null, 2));
-        lines.push("```");
-      }
-      return lines.join("\n");
-    }
-
-    return `\`\`\`json\n${JSON.stringify(outputRecord, null, 2)}\n\`\`\``;
+  const eventText = asString(data.text);
+  if (eventText && eventText.trim()) {
+    return eventText.trim();
   }
 
   return existingAssistantText || "No response output was returned.";
@@ -252,6 +391,7 @@ export function useChatSession() {
     const controller = new AbortController();
     activeAbortControllerRef.current = controller;
     let finalAssistantText = "";
+    let hasMarkedStreaming = false;
 
     try {
       await streamChatSse({
@@ -268,10 +408,13 @@ export function useChatSession() {
               const delta = asString(event.data?.delta);
               if (delta) {
                 finalAssistantText += delta;
-                dispatch({
-                  type: "append_token",
-                  payload: { requestId, delta },
-                });
+                if (!hasMarkedStreaming) {
+                  dispatch({
+                    type: "mark_streaming",
+                    payload: { requestId },
+                  });
+                  hasMarkedStreaming = true;
+                }
               }
               break;
             }

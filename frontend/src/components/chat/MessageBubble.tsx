@@ -32,6 +32,26 @@ function formatTime(timestamp: string): string {
   });
 }
 
+function getAssistantPlaceholder(message: ChatMessage): string {
+  if (message.content.trim()) {
+    return message.content;
+  }
+
+  if (message.status === "submitted") {
+    return "_Reviewing your prompt and loading the scoring rubric..._";
+  }
+
+  if (message.status === "streaming") {
+    return "_Analyzing the workflow and drafting the final assessment..._";
+  }
+
+  if (message.status === "error") {
+    return "_The assessment could not be completed._";
+  }
+
+  return "_Awaiting assessment output..._";
+}
+
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isAssistant = message.role === "assistant";
   const status = formatStatus(message);
@@ -73,7 +93,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
         <div className="relative space-y-3 px-4 py-4">
           {isAssistant ? (
-            <MarkdownRenderer content={message.content || "_Priming stream..._"} />
+            <MarkdownRenderer content={getAssistantPlaceholder(message)} />
           ) : (
             <p className="whitespace-pre-wrap text-[0.96rem] font-medium leading-7 text-foreground">
               {message.content}
@@ -83,7 +103,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           {isAssistant && isStreaming ? (
             <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.24em] text-primary/90">
               <span className="status-pulse h-2.5 w-2.5 rounded-full bg-primary" />
-              <span>live token feed</span>
+              <span>live analysis</span>
               <span className="stream-caret" />
             </div>
           ) : null}

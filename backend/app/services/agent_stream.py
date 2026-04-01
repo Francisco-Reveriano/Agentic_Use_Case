@@ -233,7 +233,8 @@ async def stream_agent_events(payload: ChatStreamRequest) -> AsyncIterator[bytes
     completed_at = datetime.now(timezone.utc)
     latency_ms = int((time.perf_counter() - started_perf) * 1000)
 
-    yield encode_sse({"type": "final", "data": {"output": final_output, "text": final_text}})
+    final_event_text = final_text if not isinstance(final_output, dict) else None
+    yield encode_sse({"type": "final", "data": {"output": final_output, "text": final_event_text}})
 
     await _safe_insert_chat_run(
         ChatRunLogEntry(
