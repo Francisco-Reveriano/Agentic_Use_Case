@@ -65,7 +65,10 @@ export function MarkdownRenderer({ content }: MarkdownRendererProps) {
             />
           ),
           td: ({ className, ...props }) => (
-            <td className={cn("border border-border/60 px-3 py-3 align-top text-sm leading-6", className)} {...props} />
+            <td
+              className={cn("border border-border/60 px-3 py-3 align-top text-sm leading-6", className)}
+              {...props}
+            />
           ),
           pre: ({ className, ...props }) => (
             <pre

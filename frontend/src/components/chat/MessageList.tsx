@@ -22,8 +22,12 @@ export function MessageList({
   const endRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
+    if (highlightedMessageId) {
+      return;
+    }
+
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages]);
+  }, [messages, highlightedMessageId]);
 
   useEffect(() => {
     if (!highlightedMessageId) {
@@ -44,14 +48,14 @@ export function MessageList({
           </div>
           <div className="text-right font-mono text-[10px] uppercase tracking-[0.26em] text-muted-foreground">
             <p>{messages.length} frames</p>
-            <p>auto-scroll armed</p>
+            <p>{highlightedMessageId ? "focused on selection" : "auto-scroll armed"}</p>
           </div>
         </div>
       </div>
 
       <div className="relative p-4 md:p-5">
         {!messages.length ? (
-          <div className="panel-surface border-dashed border-primary/35 bg-background/30 px-5 py-6">
+          <div className="panel-surface border-dashed border-primary/25 bg-background/30 px-5 py-6">
             <p className="panel-kicker text-primary/85">awaiting first process</p>
             <h3 className="display-title mt-2 text-[2.2rem] text-foreground">
               Drop a workflow into the engine
@@ -99,7 +103,9 @@ export function MessageList({
                   <div
                     className={cn(
                       "transition-all duration-300",
-                      message.id === highlightedMessageId ? "scale-[1.01]" : "scale-100",
+                      message.id === highlightedMessageId
+                        ? "scale-[1.01] rounded-none ring-2 ring-primary/45 ring-offset-2 ring-offset-background"
+                        : "scale-100",
                     )}
                   >
                     <MessageBubble message={message} />

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Activity, Bot, Gauge, Radar, Sparkles, Workflow } from "lucide-react";
+import { Activity, Bot, Gauge, Radar, Workflow } from "lucide-react";
 
 import { Composer } from "./Composer";
 import { ConversationToolbar } from "./ConversationToolbar";
@@ -30,6 +30,7 @@ export function ChatShell({
   const userMessageCount = state.messages.filter((message) => message.role === "user").length;
   const assistantMessageCount = state.messages.filter((message) => message.role === "assistant").length;
   const reversedToolEvents = [...state.toolEvents].reverse();
+  const hasToolActivity = reversedToolEvents.length > 0;
   const [draftValue, setDraftValue] = useState("");
   const [focusToken, setFocusToken] = useState(0);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
@@ -55,8 +56,6 @@ export function ChatShell({
     "dimension-by-dimension review",
     "follow-up context",
     "structured markdown output",
-    "markdown rendering",
-    "openai model deck",
     "operating-model analysis",
   ];
 
@@ -73,17 +72,17 @@ export function ChatShell({
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-4 px-4 py-6 md:px-6 md:py-8">
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.28fr)_340px]">
-        <header className="panel-surface panel-heavy relative min-h-[24rem] px-5 py-5 sm:px-6 sm:py-6">
-          <div className="absolute right-4 top-4 border border-primary/45 bg-primary/12 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.34em] text-primary">
+    <div className="mx-auto flex w-full max-w-[1480px] flex-col gap-4 px-4 py-6 md:px-6 md:py-8">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1.3fr)_320px]">
+        <header className="panel-surface panel-heavy relative min-h-[22rem] px-5 py-5 sm:px-6 sm:py-6">
+          <div className="absolute right-4 top-4 border border-primary/35 bg-primary/10 px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.34em] text-primary">
             live analysis
           </div>
 
           <div className="relative z-10 flex h-full flex-col justify-between gap-8">
             <div className="max-w-4xl space-y-4">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge className="rounded-none border border-primary/40 bg-primary/15 px-2 py-1 text-[10px] uppercase tracking-[0.25em] text-primary hover:bg-primary/15">
+                <Badge className="rounded-none border border-primary/35 bg-primary/12 px-2 py-1 text-[10px] uppercase tracking-[0.25em] text-primary hover:bg-primary/12">
                   OpenAI Only
                 </Badge>
                 <Badge className="rounded-none border border-border bg-background/30 px-2 py-1 text-[10px] uppercase tracking-[0.25em] text-muted-foreground hover:bg-background/30">
@@ -92,13 +91,11 @@ export function ChatShell({
               </div>
 
               <div className="space-y-3">
-                <p className="panel-kicker text-primary/90">
-                  Generative AI suitability review desk
-                </p>
+                <p className="panel-kicker text-primary/90">Generative AI suitability review desk</p>
                 <div className="flex items-start gap-3">
                   <Bot className="mt-2 h-6 w-6 text-primary" />
                   <div className="space-y-3">
-                    <h1 className="display-title text-[clamp(4.8rem,12vw,9.5rem)] text-foreground">
+                    <h1 className="display-title text-[clamp(4.5rem,11vw,8.4rem)] text-foreground">
                       Assess the
                       <br />
                       use case
@@ -106,15 +103,15 @@ export function ChatShell({
                     <p className="max-w-2xl text-sm leading-7 tracking-[0.04em] text-muted-foreground">
                       A consulting-style workspace for interrogating business processes through the
                       `Agentic_Calculator_Tool`, with live analysis, model switching, structured
-                      Markdown output, and visible tool telemetry.
+                      markdown output, and contextual follow-up.
                     </p>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="overflow-hidden border-y-2 border-border/70 py-2">
-              <div className="motion-marquee flex min-w-max items-center gap-8 pr-8 font-mono text-[10px] uppercase tracking-[0.4em] text-primary/90">
+            <div className="overflow-hidden border-y border-border/60 py-2">
+              <div className="motion-marquee flex min-w-max items-center gap-8 pr-8 font-mono text-[10px] uppercase tracking-[0.32em] text-primary/90">
                 {[...marqueeItems, ...marqueeItems].map((item, index) => (
                   <span key={`${item}-${index}`}>{item}</span>
                 ))}
@@ -130,9 +127,9 @@ export function ChatShell({
               <Radar className="h-4 w-4 text-primary" />
             </div>
             <div className="space-y-1">
-              <p className="display-title text-[3.1rem] text-foreground">{state.messages.length}</p>
-              <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-muted-foreground">
-                {userMessageCount} user / {assistantMessageCount} assistant
+              <p className="display-title text-[3rem] text-foreground">{state.messages.length}</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                {userMessageCount} prompt / {assistantMessageCount} response
               </p>
             </div>
           </div>
@@ -143,9 +140,9 @@ export function ChatShell({
               <Activity className="h-4 w-4 text-accent" />
             </div>
             <div className="space-y-1">
-              <p className="display-title text-[3.1rem] text-foreground">{sessionStatusLabel}</p>
-              <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-muted-foreground">
-                {isBusy ? "channel occupied" : "channel open"}
+              <p className="display-title text-[3rem] text-foreground">{sessionStatusLabel}</p>
+              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                {isBusy ? "analysis in progress" : "ready for review"}
               </p>
             </div>
           </div>
@@ -156,18 +153,18 @@ export function ChatShell({
               <Gauge className="h-4 w-4 text-primary" />
             </div>
             <div className="space-y-2">
-              <p className="font-mono text-lg uppercase tracking-[0.14em] text-foreground">
+              <p className="font-mono text-lg uppercase tracking-[0.12em] text-foreground">
                 {state.selectedModel || "waiting"}
               </p>
-              <p className="font-mono text-[11px] uppercase tracking-[0.26em] text-muted-foreground">
-                {state.toolEvents.length} tool events tracked
+              <p className="font-mono text-[11px] uppercase tracking-[0.22em] text-muted-foreground">
+                {hasToolActivity ? `${state.toolEvents.length} tool events visible` : "streamlined review mode"}
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
+      <section className={hasToolActivity ? "grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]" : "grid gap-4"}>
         <div className="space-y-4">
           <ModelToolbar
             availableModels={state.availableModels}
@@ -207,38 +204,28 @@ export function ChatShell({
           ) : null}
         </div>
 
-        <aside className="panel-surface panel-heavy p-0 xl:sticky xl:top-6">
-          <div className="border-b-2 border-border/70 px-4 py-4">
-            <div className="mb-2 flex items-center gap-2">
-              <Workflow className="h-4 w-4 text-primary" />
-              <p className="panel-kicker text-primary/85">tool activity rail</p>
+        {hasToolActivity ? (
+          <aside className="panel-surface panel-heavy p-0 xl:sticky xl:top-6">
+            <div className="border-b border-border/70 px-4 py-4">
+              <div className="mb-2 flex items-center gap-2">
+                <Workflow className="h-4 w-4 text-primary" />
+                <p className="panel-kicker text-primary/85">tool activity</p>
+              </div>
+              <h2 className="display-title text-[2.7rem] text-foreground">Execution Trail</h2>
+              <p className="mt-2 text-xs leading-5 tracking-[0.06em] text-muted-foreground">
+                Live tool lifecycle updates are shown here only when the backend emits them.
+              </p>
             </div>
-            <h2 className="display-title text-[2.9rem] text-foreground">System Events</h2>
-            <p className="mt-2 text-xs uppercase leading-5 tracking-[0.14em] text-muted-foreground">
-              Every tool lifecycle event appears here as a live strip with output details.
-            </p>
-          </div>
 
-          <ScrollArea className="h-[min(72vh,840px)]">
-            <div className="activity-rail space-y-3 p-4 pl-8">
-              {reversedToolEvents.length ? (
-                reversedToolEvents.map((event) => <ToolCallEvent key={event.id} event={event} />)
-              ) : (
-                <div className="panel-surface border-dashed border-primary/35 bg-background/25 px-4 py-5">
-                  <div className="mb-3 flex items-center gap-2">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                    <p className="panel-kicker text-primary/85">stand by</p>
-                  </div>
-                  <p className="display-title text-[2rem] text-foreground">Awaiting Tool Traffic</p>
-                  <p className="mt-3 text-xs uppercase leading-5 tracking-[0.14em] text-muted-foreground">
-                    Tool start and completion events will populate this rail once the backend emits
-                    them.
-                  </p>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-        </aside>
+            <ScrollArea className="h-[min(72vh,840px)]">
+              <div className="activity-rail space-y-3 p-4 pl-8">
+                {reversedToolEvents.map((event) => (
+                  <ToolCallEvent key={event.id} event={event} />
+                ))}
+              </div>
+            </ScrollArea>
+          </aside>
+        ) : null}
       </section>
     </div>
   );

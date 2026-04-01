@@ -145,8 +145,12 @@ type DimensionRow = {
   reasoning: string;
 };
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 function escapeMarkdownTableCell(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n+/g, "<br /><br />").trim();
+  return value.replace(/\|/g, "\\|").replace(/\n+/g, " ").trim();
 }
 
 function extractDimensionRows(reasoning: string): {
@@ -154,11 +158,24 @@ function extractDimensionRows(reasoning: string): {
   summary: string | null;
 } {
   const normalized = reasoning.replace(/\r\n/g, "\n").trim();
-  const positions = ASSESSMENT_DIMENSIONS.map((label) => ({
-    label,
-    index: normalized.indexOf(`${label}:`),
-  }))
-    .filter((entry) => entry.index >= 0)
+  const positions = ASSESSMENT_DIMENSIONS.map((label) => {
+    const match = new RegExp(
+      `(?:Dimension\s*\d+\s*:\s*)?${escapeRegExp(label)}\s*(?:[—-]|:)\s*`,
+      "i",
+    ).exec(normalized);
+
+    return match
+      ? {
+          label,
+          index: match.index,
+          marker: match[0],
+        }
+      : null;
+  })
+    .filter(
+      (entry): entry is { label: (typeof ASSESSMENT_DIMENSIONS)[number]; index: number; marker: string } =>
+        Boolean(entry),
+    )
     .sort((left, right) => left.index - right.index);
 
   if (!positions.length) {
@@ -176,23 +193,23 @@ function extractDimensionRows(reasoning: string): {
   }
 
   positions.forEach((entry, index) => {
-    const start = entry.index + entry.label.length + 1;
+    const start = entry.index + entry.marker.length;
     const end = index < positions.length - 1 ? positions[index + 1].index : normalized.length;
     let body = normalized.slice(start, end).trim();
 
     if (index === positions.length - 1) {
-      const overallMatch = body.match(/(?:^|\n{2,})(Overall[,:\s][\s\S]*)$/i);
-      if (overallMatch && overallMatch.index !== undefined) {
-        const overallText = overallMatch[1].trim();
-        body = body.slice(0, overallMatch.index).trim();
-        if (overallText) {
-          summaryParts.push(overallText);
+      const summaryMatch = body.match(/(?:^|\n\n)(Overall[^\n]*|Classification:[\s\S]*|Chain of Thought[\s\S]*)$/i);
+      if (summaryMatch && summaryMatch.index !== undefined) {
+        const trailingSummary = summaryMatch[0].trim();
+        body = body.slice(0, summaryMatch.index).trim();
+        if (trailingSummary) {
+          summaryParts.push(trailingSummary);
         }
       }
     }
 
     let score: string | null = null;
-    const scoreMatch = body.match(/^([0-5](?:\.\d+)?\/5(?:\.0)?)\.?\s*(.*)$/s);
+    const scoreMatch = body.match(/^(?:\*\*Dimension score:\*\*\s*)?([0-5](?:\.\d+)?\/5(?:\.0)?)\.?\s*(.*)$/s);
     if (scoreMatch) {
       score = scoreMatch[1];
       body = scoreMatch[2].trim();
@@ -240,9 +257,7 @@ function buildAssessmentMarkdown(outputRecord: StructuredAssessment): string {
     lines.push("| --- | --- |");
     rows.forEach((row) => {
       const dimensionLabel = row.score ? `${row.label} (${row.score})` : row.label;
-      lines.push(
-        `| ${escapeMarkdownTableCell(dimensionLabel)} | ${escapeMarkdownTableCell(row.reasoning)} |`,
-      );
+      lines.push(`| ${escapeMarkdownTableCell(dimensionLabel)} | ${escapeMarkdownTableCell(row.reasoning)} |`);
     });
     lines.push("");
   }

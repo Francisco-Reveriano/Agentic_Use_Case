@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { History, MessageSquareQuote, UserRound } from "lucide-react";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -28,6 +29,19 @@ export function ConversationToolbar({
 }: ConversationToolbarProps) {
   let userCount = 0;
   let assistantCount = 0;
+  const chipRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  useEffect(() => {
+    if (!activeMessageId) {
+      return;
+    }
+
+    chipRefs.current[activeMessageId]?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [activeMessageId]);
 
   return (
     <div className="panel-surface panel-heavy px-4 py-4">
@@ -61,6 +75,9 @@ export function ConversationToolbar({
               return (
                 <Button
                   key={message.id}
+                  ref={(node) => {
+                    chipRefs.current[message.id] = node;
+                  }}
                   type="button"
                   variant="ghost"
                   data-active={isActive}
